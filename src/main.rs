@@ -108,7 +108,11 @@ fn main() {
 
     let (mut rl, thread) = raylib::init()
         .title(env!("CARGO_BIN_NAME"))
-	.size(width as i32, height as i32)
+	// .size(width as i32, height as i32)
+        .size(
+		selected_output.geometry().width() as i32,
+		selected_output.geometry().height() as i32,
+	)
         .transparent()
         .undecorated()
         .vsync()
