@@ -1,6 +1,6 @@
 use std::{env, process};
 
-use grim_rs::Grim;
+use grim_rs::{CaptureParameters, Grim};
 use raylib::{
     ffi::{Image as FfiImage, SetWindowMonitor, ToggleFullscreen},
     prelude::*,
@@ -44,20 +44,71 @@ fn main() {
             }),
     };
 
-    let result = grim
-        .capture_output(selected_output.name())
-        .expect("failed to capture selected output");
+    let params: Vec<CaptureParameters> = outputs
+	.iter()
+	.map(|out| CaptureParameters::new(out.name()).overlay_cursor(false))
+	.collect();
 
-    let width = result.width();
-    let height = result.height();
-    let raw_pixels = result.data().to_vec();
+    let results = grim
+	.capture_outputs(params)
+	.expect("failed to capture outputs");
+
+    // Compute the bounding box of all outputs in layout space.
+    let min_x = outputs
+	.iter()
+	.map(|o| o.geometry().x())
+	.min()
+	.expect("no outputs");
+    let min_y = outputs
+	.iter()
+	.map(|o| o.geometry().y())
+	.min()
+	.expect("no outputs");
+    let max_x = outputs
+	.iter()
+	.map(|o| o.geometry().x() + o.geometry().width() as i32)
+	.max()
+	.expect("no outputs");
+    let max_y = outputs
+	.iter()
+	.map(|o| o.geometry().y() + o.geometry().height() as i32)
+	.max()
+	.expect("no outputs");
+
+    let width = (max_x - min_x) as u32;
+    let height = (max_y - min_y) as u32;
+
+    // RGBA canvas
+    let mut raw_pixels = vec![0u8; (width * height * 4) as usize];
+
+    for output in outputs.iter() {
+	let result = results
+	    .get(output.name())
+            .expect("missing capture result for output");
+
+    let ox = (output.geometry().x() - min_x) as u32;
+    let oy = (output.geometry().y() - min_y) as u32;
+
+    let out_w = result.width() as u32;
+    let out_h = result.height() as u32;
+    let src = result.data();
+
+    for row in 0..out_h {
+        let dst_start = (((oy + row) * width + ox) * 4) as usize;
+        let dst_end = dst_start + (out_w * 4) as usize;
+
+        let src_start = (row * out_w * 4) as usize;
+        let src_end = src_start + (out_w * 4) as usize;
+
+        raw_pixels[dst_start..dst_end].copy_from_slice(&src[src_start..src_end]);
+    }
+}
+
+
 
     let (mut rl, thread) = raylib::init()
         .title(env!("CARGO_BIN_NAME"))
-        .size(
-            selected_output.geometry().width() as i32,
-            selected_output.geometry().height() as i32,
-        )
+	.size(width as i32, height as i32)
         .transparent()
         .undecorated()
         .vsync()
@@ -102,10 +153,7 @@ fn main() {
 
     let mut rl_camera = Camera2D::default();
     rl_camera.zoom = 1.0;
-    rl_camera.target = Vector2::new(
-        selected_output.geometry().x() as f32,
-        selected_output.geometry().y() as f32,
-    );
+    rl_camera.target = Vector2::new(0.0, 0.0);
 
     let mut delta_scale = 0f64;
     let mut scale_pivot = rl.get_mouse_position();
