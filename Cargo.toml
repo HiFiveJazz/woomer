@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 grim-rs = "0.1.6"
 image = "0.25.10"
-libwayshot = { git = "https://github.com/waycrate/wayshot", branch = "freeze-feat-andreas" }
 raylib = { version = "5.0.1", features = ["wayland", "opengl_33"] }
 [features]
 dev = []
