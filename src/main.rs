@@ -153,7 +153,10 @@ fn main() {
 
     let mut rl_camera = Camera2D::default();
     rl_camera.zoom = 1.0;
-    rl_camera.target = Vector2::new(0.0, 0.0);
+    rl_camera.target = Vector2::new(
+       (selected_output.geometry().x() - min_x) as f32,
+       (selected_output.geometry().y() - min_y) as f32,
+    );
 
     let mut delta_scale = 0f64;
     let mut scale_pivot = rl.get_mouse_position();
