@@ -34,12 +34,13 @@ Please also refer to: [Hyprland Wiki](https://wiki.hyprland.org/Configuring/XWay
 
 Dependencies:
 
-- wayland-client
 - cmake
-- rust
-- pkg-config
 - clang (for compiling raylib)
+- glfw (for fullscreening)
 - libclang (for bindgen)
+- pkg-config
+- rust
+- wayland-client
 
 Like with any other rust program you can run:
 
