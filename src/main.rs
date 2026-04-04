@@ -186,6 +186,25 @@ fn main() {
     spotlight_radius_multiplier_uniform_location =
         spotlight_shader.get_shader_location("spotlightRadiusMultiplier");
 
+    let idx = outputs
+        .iter()
+        .position(|o| o.name() == selected_output.name())
+        .expect("Monitor not found");
+
+    unsafe {
+        ToggleFullscreen();
+        SetWindowMonitor(idx as i32);
+    }
+
+    // Draw one fully-populated frame immediately so the first visible frame
+    // is the screenshot, not an empty/unstyled window.
+    {
+        let mut d = rl.begin_drawing(&thread);
+        let mut mode2d = d.begin_mode2D(rl_camera);
+        mode2d.clear_background(Color::get_color(0));
+        mode2d.draw_texture(&screenshot_texture, 0, 0, Color::WHITE);
+    }
+
     let mut should_exit = false;
     while !rl.window_should_close() && !should_exit {
         if rl.is_key_pressed(KeyboardKey::KEY_Q) || rl.is_key_pressed(KeyboardKey::KEY_A) {
