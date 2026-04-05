@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 grim-rs = "0.1.6"
+hyprland = "0.4.0-beta.3"
 image = "0.25.10"
 raylib = { version = "5.0.1", features = ["wayland", "opengl_33"] }
 [features]

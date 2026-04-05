@@ -1,12 +1,30 @@
 use std::{env, process};
 
 use grim_rs::{CaptureParameters, Grim};
+use hyprland::{data::CursorPosition, prelude::*};
 use raylib::{
     ffi::{Image as FfiImage, SetWindowMonitor, ToggleFullscreen},
     prelude::*,
 };
 
 const SPOTLIGHT_TINT: Color = Color::new(0x00, 0x00, 0x00, 190);
+
+fn get_initial_cursor_pos_for_output(
+    out_x: i32,
+    out_y: i32,
+    out_w: i32,
+    out_h: i32,
+) -> Option<Vector2> {
+    let pos = CursorPosition::get().ok()?;
+
+    let local_x = pos.x as f32 - out_x as f32;
+    let local_y = pos.y as f32 - out_y as f32;
+
+    Some(Vector2::new(
+        local_x.clamp(0.0, out_w as f32),
+        local_y.clamp(0.0, out_h as f32),
+    ))
+}
 
 fn main() {
     let mut args = env::args();
@@ -44,36 +62,47 @@ fn main() {
             }),
     };
 
+    let mut spotlight_mouse_position = get_initial_cursor_pos_for_output(
+        selected_output.geometry().x(),
+        selected_output.geometry().y(),
+        selected_output.geometry().width() as i32,
+        selected_output.geometry().height() as i32,
+    )
+    .unwrap_or(Vector2::new(
+        selected_output.geometry().width() as f32 * 0.5,
+        selected_output.geometry().height() as f32 * 0.5,
+    ));
+
     let params: Vec<CaptureParameters> = outputs
-	.iter()
-	.map(|out| CaptureParameters::new(out.name()).overlay_cursor(false))
-	.collect();
+        .iter()
+        .map(|out| CaptureParameters::new(out.name()).overlay_cursor(false))
+        .collect();
 
     let results = grim
-	.capture_outputs(params)
-	.expect("failed to capture outputs");
+        .capture_outputs(params)
+        .expect("failed to capture outputs");
 
     // Compute the bounding box of all outputs in layout space.
     let min_x = outputs
-	.iter()
-	.map(|o| o.geometry().x())
-	.min()
-	.expect("no outputs");
+        .iter()
+        .map(|o| o.geometry().x())
+        .min()
+        .expect("no outputs");
     let min_y = outputs
-	.iter()
-	.map(|o| o.geometry().y())
-	.min()
-	.expect("no outputs");
+        .iter()
+        .map(|o| o.geometry().y())
+        .min()
+        .expect("no outputs");
     let max_x = outputs
-	.iter()
-	.map(|o| o.geometry().x() + o.geometry().width() as i32)
-	.max()
-	.expect("no outputs");
+        .iter()
+        .map(|o| o.geometry().x() + o.geometry().width() as i32)
+        .max()
+        .expect("no outputs");
     let max_y = outputs
-	.iter()
-	.map(|o| o.geometry().y() + o.geometry().height() as i32)
-	.max()
-	.expect("no outputs");
+        .iter()
+        .map(|o| o.geometry().y() + o.geometry().height() as i32)
+        .max()
+        .expect("no outputs");
 
     let width = (max_x - min_x) as u32;
     let height = (max_y - min_y) as u32;
@@ -82,37 +111,35 @@ fn main() {
     let mut raw_pixels = vec![0u8; (width * height * 4) as usize];
 
     for output in outputs.iter() {
-	let result = results
-	    .get(output.name())
+        let result = results
+            .get(output.name())
             .expect("missing capture result for output");
 
-    let ox = (output.geometry().x() - min_x) as u32;
-    let oy = (output.geometry().y() - min_y) as u32;
+        let ox = (output.geometry().x() - min_x) as u32;
+        let oy = (output.geometry().y() - min_y) as u32;
 
-    let out_w = result.width() as u32;
-    let out_h = result.height() as u32;
-    let src = result.data();
+        let out_w = result.width() as u32;
+        let out_h = result.height() as u32;
+        let src = result.data();
 
-    for row in 0..out_h {
-        let dst_start = (((oy + row) * width + ox) * 4) as usize;
-        let dst_end = dst_start + (out_w * 4) as usize;
+        for row in 0..out_h {
+            let dst_start = (((oy + row) * width + ox) * 4) as usize;
+            let dst_end = dst_start + (out_w * 4) as usize;
 
-        let src_start = (row * out_w * 4) as usize;
-        let src_end = src_start + (out_w * 4) as usize;
+            let src_start = (row * out_w * 4) as usize;
+            let src_end = src_start + (out_w * 4) as usize;
 
-        raw_pixels[dst_start..dst_end].copy_from_slice(&src[src_start..src_end]);
+            raw_pixels[dst_start..dst_end].copy_from_slice(&src[src_start..src_end]);
+        }
     }
-}
-
-
 
     let (mut rl, thread) = raylib::init()
         .title(env!("CARGO_BIN_NAME"))
-	// .size(width as i32, height as i32)
+        // .size(width as i32, height as i32)
         .size(
-		selected_output.geometry().width() as i32,
-		selected_output.geometry().height() as i32,
-	)
+            selected_output.geometry().width() as i32,
+            selected_output.geometry().height() as i32,
+        )
         .transparent()
         .undecorated()
         .vsync()
@@ -158,8 +185,8 @@ fn main() {
     let mut rl_camera = Camera2D::default();
     rl_camera.zoom = 1.0;
     rl_camera.target = Vector2::new(
-       (selected_output.geometry().x() - min_x) as f32,
-       (selected_output.geometry().y() - min_y) as f32,
+        (selected_output.geometry().x() - min_x) as f32,
+        (selected_output.geometry().y() - min_y) as f32,
     );
 
     let mut delta_scale = 0f64;
@@ -167,6 +194,7 @@ fn main() {
     let mut velocity = Vector2::default();
     let mut spotlight_radius_multiplier = 1.0;
     let mut spotlight_radius_multiplier_delta = 0.0;
+    let mut spotlight_opacity = 0.0f32;
 
     #[cfg(feature = "dev")]
     let mut spotlight_tint_uniform_location;
@@ -231,6 +259,16 @@ fn main() {
             || rl.is_key_down(KeyboardKey::KEY_RIGHT_CONTROL);
 
         let scrolled_amount = rl.get_mouse_wheel_move_v().y;
+        let frame_time = rl.get_frame_time();
+
+        let target_opacity = if enable_spotlight {
+            SPOTLIGHT_TINT.a as f32 / 255.0
+        } else {
+            0.0
+        };
+
+        let fade_speed = 4.0f32;
+        spotlight_opacity += (target_opacity - spotlight_opacity) * frame_time * fade_speed;
 
         if rl.is_key_pressed(KeyboardKey::KEY_LEFT_CONTROL)
             || rl.is_key_pressed(KeyboardKey::KEY_RIGHT_CONTROL)
@@ -258,19 +296,19 @@ fn main() {
 
         if delta_scale.abs() > 0.5 {
             let p0 = scale_pivot / rl_camera.zoom;
-            rl_camera.zoom = (rl_camera.zoom as f64 + delta_scale * rl.get_frame_time() as f64)
+            rl_camera.zoom = (rl_camera.zoom as f64 + delta_scale * frame_time as f64)
                 .clamp(1.0, 10.0) as f32;
             let p1 = scale_pivot / rl_camera.zoom;
             rl_camera.target += p0 - p1;
-            delta_scale -= delta_scale * rl.get_frame_time() as f64 * 4.0;
+            delta_scale -= delta_scale * frame_time as f64 * 4.0;
         }
 
         spotlight_radius_multiplier = (spotlight_radius_multiplier as f64
-            + spotlight_radius_multiplier_delta * rl.get_frame_time() as f64)
+            + spotlight_radius_multiplier_delta * frame_time as f64)
             .clamp(0.3, 10.0) as f32;
 
         spotlight_radius_multiplier_delta -=
-            spotlight_radius_multiplier_delta * rl.get_frame_time() as f64 * 4.0;
+            spotlight_radius_multiplier_delta * frame_time as f64 * 4.0;
 
         const VELOCITY_THRESHOLD: f32 = 15.0;
         if rl.is_mouse_button_down(MouseButton::MOUSE_BUTTON_LEFT) {
@@ -282,20 +320,32 @@ fn main() {
             rl_camera.target += delta;
             velocity = delta * rl.get_fps().as_f32();
         } else if velocity.length_sqr() > VELOCITY_THRESHOLD * VELOCITY_THRESHOLD {
-            rl_camera.target += velocity * rl.get_frame_time();
-            velocity -= velocity * rl.get_frame_time() * 6.0;
+            rl_camera.target += velocity * frame_time;
+            velocity -= velocity * frame_time * 6.0;
         }
 
         let mut d = rl.begin_drawing(&thread);
         let mut mode2d = d.begin_mode2D(rl_camera);
 
-        if enable_spotlight {
-            mode2d.clear_background(SPOTLIGHT_TINT);
-            let mouse_position = mode2d.get_mouse_position();
+        if enable_spotlight || spotlight_opacity > 0.001 {
+            mode2d.clear_background(Color::get_color(0));
+
+            let current_mouse_position = mode2d.get_mouse_position();
+
+            if current_mouse_position.x != 0.0 || current_mouse_position.y != 0.0 {
+                spotlight_mouse_position = current_mouse_position;
+            }
+
+            let mouse_position = spotlight_mouse_position;
 
             spotlight_shader.set_shader_value(
                 spotlight_tint_uniform_location,
-                SPOTLIGHT_TINT.color_normalize(),
+                Vector4::new(
+                    SPOTLIGHT_TINT.r as f32 / 255.0,
+                    SPOTLIGHT_TINT.g as f32 / 255.0,
+                    SPOTLIGHT_TINT.b as f32 / 255.0,
+                    spotlight_opacity,
+                ),
             );
 
             let screen_height = mode2d.get_screen_height().as_f32();
